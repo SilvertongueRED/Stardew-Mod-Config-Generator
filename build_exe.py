@@ -36,17 +36,17 @@ def main() -> None:
         str(script),
     ]
 
-    print("Running PyInstaller…")
+    print("Running PyInstaller...")
     print(" ".join(cmd))
     result = subprocess.run(cmd, cwd=str(HERE))
     if result.returncode == 0:
-        print("\n✓ Build successful!")
+        print("\n[OK] Build successful!")
         dist = HERE / "dist" / "StardewModConfigurator"
         if sys.platform == "win32":
             dist = dist.with_suffix(".exe")
         print(f"  Output: {dist}")
     else:
-        print("\n✗ Build failed.")
+        print("\n[FAIL] Build failed.")
         sys.exit(result.returncode)
 
 
