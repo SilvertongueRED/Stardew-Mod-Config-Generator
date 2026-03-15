@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (e.g. v1.0.0). Leave empty for a dry-run build."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: StardewModConfigurator.exe
+            asset_name: StardewModConfigurator-Windows.exe
+          - os: ubuntu-latest
+            artifact: StardewModConfigurator
+            asset_name: StardewModConfigurator-Linux
+          - os: macos-latest
+            artifact: StardewModConfigurator
+            asset_name: StardewModConfigurator-macOS
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build standalone executable
+        run: python build_exe.py
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag_name != ''
+
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp artifacts/StardewModConfigurator-Windows.exe/StardewModConfigurator.exe release/StardewModConfigurator-Windows.exe
+          cp artifacts/StardewModConfigurator-Linux/StardewModConfigurator release/StardewModConfigurator-Linux
+          cp artifacts/StardewModConfigurator-macOS/StardewModConfigurator release/StardewModConfigurator-macOS
+          chmod +x release/StardewModConfigurator-Linux release/StardewModConfigurator-macOS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Stardew Mod Configurator ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            release/StardewModConfigurator-Windows.exe
+            release/StardewModConfigurator-Linux
+            release/StardewModConfigurator-macOS
