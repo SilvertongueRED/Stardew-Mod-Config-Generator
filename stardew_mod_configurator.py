@@ -300,7 +300,7 @@ def _split_multi_target_patches(changes: list[dict]) -> list[dict]:
     result: list[dict] = []
     for patch in changes:
         target = patch.get("Target", patch.get("target", ""))
-        targets = [t.strip() for t in target.split(",")]
+        targets = [t.strip() for t in target.split(",") if t.strip()]
         if len(targets) > 1:
             key = "Target" if "Target" in patch else "target"
             for single_target in targets:
