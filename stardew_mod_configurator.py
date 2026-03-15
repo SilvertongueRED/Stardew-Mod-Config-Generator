@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import re
@@ -290,6 +291,27 @@ def _cp_category_for_patch(patch: dict) -> tuple[str, str | None]:
     return "Other", None
 
 
+def _split_multi_target_patches(changes: list[dict]) -> list[dict]:
+    """Split Change entries with comma-separated Targets into individual entries.
+
+    This allows each target in a multi-target patch to be independently
+    toggled at high granularity.
+    """
+    result: list[dict] = []
+    for patch in changes:
+        target = patch.get("Target", patch.get("target", ""))
+        targets = [t.strip() for t in target.split(",")]
+        if len(targets) > 1:
+            key = "Target" if "Target" in patch else "target"
+            for single_target in targets:
+                new_patch = copy.deepcopy(patch)
+                new_patch[key] = single_target
+                result.append(new_patch)
+        else:
+            result.append(patch)
+    return result
+
+
 def _cp_collect_patches(changes: list[dict], granularity: str) -> dict:
     """Analyse patches and return structured info for config key generation.
 
@@ -343,6 +365,11 @@ def convert_cp_mod(
 
     changes: list[dict] = content.get("Changes", [])
     log(f"Found {len(changes)} patch entries in Changes[]", "info")
+
+    # At high granularity, split multi-target patches so each target gets
+    # its own toggle
+    if granularity == "high":
+        changes = _split_multi_target_patches(changes)
 
     # Analyse patches
     analysis = _cp_collect_patches(changes, granularity)
