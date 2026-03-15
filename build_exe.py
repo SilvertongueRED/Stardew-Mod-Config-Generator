@@ -27,7 +27,7 @@ def main() -> None:
     cmd = [
         sys.executable,
         "-m",
-        "pyinstaller",
+        "PyInstaller",
         "--onefile",
         "--windowed",
         "--name",
