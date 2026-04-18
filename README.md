@@ -11,6 +11,7 @@ Convert **Content Patcher (CP)** or **Alternative Textures (AT)** Stardew Valley
 - 💾 **Automatic full backup** of the mod folder before any changes
 - 🖼️ **Stardew Valley-themed GUI** (warm browns, golden accents, parchment log)
 - 📄 Generates `config.json`, `i18n/default.json`, and updates `content.json`
+- 📝 Writes a persistent `conversion_log.txt` in the selected mod folder
 - 🖥️ **CLI mode** for scripting and automation
 - 📦 Portable standalone `.exe` via PyInstaller
 
@@ -50,12 +51,14 @@ Download the pre-built `StardewModConfigurator.exe` from the Releases page, or b
 4. **Step 3** — click **🌟 Convert Mod**.
 
 A backup is created automatically before any files are modified.  
-The output log shows every action taken, colour-coded by severity.
+The output log shows every action taken, colour-coded by severity, and the same output is written to `conversion_log.txt` in the selected mod folder.
 
 ### CLI mode
 
 ```bash
 python stardew_mod_configurator.py --cli <path/to/mod> [--granularity low|medium|high]
+# Disable log file output if needed
+python stardew_mod_configurator.py --cli <path/to/mod> --no-log-file
 ```
 
 Examples:
