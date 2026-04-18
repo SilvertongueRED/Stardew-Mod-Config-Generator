@@ -421,6 +421,8 @@ def convert_cp_mod(
     for idx, keys in patch_keys:
         patch = changes[idx]
         existing_when: dict = patch.get("When", {})
+        if not isinstance(existing_when, dict):
+            existing_when = {}
         for key in keys:
             if key not in existing_when:
                 existing_when[key] = "true"
@@ -658,56 +660,74 @@ def run_conversion(
     mod_dir_str: str,
     granularity: str = "medium",
     log_fn=None,
+    log_to_file: bool = True,
+    log_file_name: str = "conversion_log.txt",
 ) -> bool:
     """Main entry point for conversion.  Returns True on success."""
+
+    mod_dir = Path(mod_dir_str).resolve()
+    log_file_handle = None
+    log_file_path = mod_dir / log_file_name
 
     def log(msg: str, level: str = "info") -> None:
         if log_fn:
             log_fn(msg, level)
         else:
             print(f"[{level.upper()}] {msg}")
+        if log_file_handle:
+            log_file_handle.write(f"[{level.upper()}] {msg}\n")
+            log_file_handle.flush()
 
-    mod_dir = Path(mod_dir_str).resolve()
+    if log_to_file and mod_dir.is_dir():
+        try:
+            log_file_handle = log_file_path.open("w", encoding="utf-8")
+            log(f"Writing conversion log to: {log_file_path}", "file")
+        except Exception as exc:
+            log(f"Warning: could not open log file {log_file_path}: {exc}", "warning")
 
-    if not mod_dir.is_dir():
-        log(f"Error: {mod_dir} is not a directory", "error")
-        return False
-
-    log(f"Processing mod folder: {mod_dir}", "info")
-
-    # Detect mod type
-    mod_type, reason = detect_mod_type(mod_dir)
-    log(f"Detected mod type: {mod_type} ({reason})", "info")
-
-    if mod_type == ModType.UNKNOWN:
-        log(
-            "Could not detect mod type. "
-            "Ensure the folder contains manifest.json, content.json, or Textures/",
-            "error",
-        )
-        return False
-
-    # Backup
     try:
-        backup_path = create_backup(mod_dir, log_fn=log_fn)
-        log(f"Backup: {backup_path}", "success")
-    except Exception as exc:
-        log(f"Backup failed: {exc}", "error")
-        return False
+        if not mod_dir.is_dir():
+            log(f"Error: {mod_dir} is not a directory", "error")
+            return False
 
-    # Convert
-    try:
-        if mod_type == ModType.CP:
-            convert_cp_mod(mod_dir, granularity, log_fn=log)
-        elif mod_type == ModType.AT:
-            convert_at_mod(mod_dir, granularity, log_fn=log)
-        return True
-    except Exception as exc:
-        import traceback
+        log(f"Processing mod folder: {mod_dir}", "info")
 
-        log(f"Conversion failed: {exc}", "error")
-        log(traceback.format_exc(), "error")
-        return False
+        # Detect mod type
+        mod_type, reason = detect_mod_type(mod_dir)
+        log(f"Detected mod type: {mod_type} ({reason})", "info")
+
+        if mod_type == ModType.UNKNOWN:
+            log(
+                "Could not detect mod type. "
+                "Ensure the folder contains manifest.json, content.json, or Textures/",
+                "error",
+            )
+            return False
+
+        # Backup
+        try:
+            backup_path = create_backup(mod_dir, log_fn=log)
+            log(f"Backup: {backup_path}", "success")
+        except Exception as exc:
+            log(f"Backup failed: {exc}", "error")
+            return False
+
+        # Convert
+        try:
+            if mod_type == ModType.CP:
+                convert_cp_mod(mod_dir, granularity, log_fn=log)
+            elif mod_type == ModType.AT:
+                convert_at_mod(mod_dir, granularity, log_fn=log)
+            return True
+        except Exception as exc:
+            import traceback
+
+            log(f"Conversion failed: {exc}", "error")
+            log(traceback.format_exc(), "error")
+            return False
+    finally:
+        if log_file_handle:
+            log_file_handle.close()
 
 
 # ---------------------------------------------------------------------------
@@ -726,6 +746,11 @@ def cli_main() -> None:
         default="medium",
         help="Toggle granularity: low=categories only, medium=categories+groups, high=individual items",
     )
+    parser.add_argument(
+        "--no-log-file",
+        action="store_true",
+        help="Disable writing conversion_log.txt in the selected mod folder",
+    )
     args = parser.parse_args()
 
     def cli_log(msg: str, level: str = "info") -> None:
@@ -734,7 +759,12 @@ def cli_main() -> None:
         )
         print(f"{prefix} {msg}")
 
-    success = run_conversion(args.mod_dir, args.granularity, log_fn=cli_log)
+    success = run_conversion(
+        args.mod_dir,
+        args.granularity,
+        log_fn=cli_log,
+        log_to_file=not args.no_log_file,
+    )
     sys.exit(0 if success else 1)
 
 
